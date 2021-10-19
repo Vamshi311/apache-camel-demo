@@ -1,0 +1,73 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    jdbc-url: jdbc:mysql://localhost:3306/pmic?useSSL=false
+    username: root
+    password: pmic
+    hikari:
+      maximum-pool-size: 5
+      pool-name: pmic-connection-pool
+      connection-timeout: 5000
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+  jackson:
+    default-property-inclusion: NON_NULL
+    serialization:
+      write-dates-as-timestamps: false    
+  jpa:
+    show-sql: true
+    generate-ddl: true
+    #database-platform: org.hibernate.dialect.MySQL5InnoDBDialect
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5Dialect
+  rabbitmq:
+    host: localhost
+    port: 5672
+    addresses: localhost:5672
+    username: guest
+    password: guest
+    
+camel:
+  dataformat:
+    json-jackson:
+      object-mapper: jacksonObjectMapper
+  springboot:
+    trace-formatter-show-body: true
+    trace-formatter-show-headers: true
+    tracing: false   
+
+order:
+  exchange: order-exchange
+  exchange-type: direct
+  routing-key: order-online
+  queue: order-queue
+  consumers: 5
+ 
+trigger-ship-route: rabbitmq:${order.exchange}?exchangeType=${order.exchange-type}&routingKey=${order.routing-key}&queue=${order.queue}&concurrentConsumers=${order.consumers}&addresses=${spring.rabbitmq.addresses}&threadPoolSize=${order.consumers}&durable=true&autoAck=false&autoDelete=false&connectionFactory=#pmicRabbitConnectionFactory&prefetchEnabled=true&prefetchCount=1
+
+ship:
+  exchange: ship-exchange
+  exchange-type: direct
+  routing-key: ship-orders
+  queue: ship-queue
+  consumers: 5
+
+ship-route: rabbitmq:${ship.exchange}?exchangeType=${ship.exchange-type}&routingKey=${ship.routing-key}&queue=${ship.queue}&concurrentConsumers=${ship.consumers}&addresses=${spring.rabbitmq.addresses}&threadPoolSize=${ship.consumers}&durable=true&autoAck=false&autoDelete=false&connectionFactory=#pmicRabbitConnectionFactory&prefetchEnabled=true&prefetchCount=1
+
+error:
+  exchange: ship-exchange
+  exchange-type: direct
+  routing-key: ship-orders-error
+  queue: error-queue
+  consumers: 5
+  
+error-route: rabbitmq:${error.exchange}?exchangeType=${error.exchange-type}&routingKey=${error.routing-key}&queue=${error.queue}&concurrentConsumers=${error.consumers}&addresses=${spring.rabbitmq.addresses}&threadPoolSize=${error.consumers}&durable=true&autoAck=false&autoDelete=false&connectionFactory=#pmicRabbitConnectionFactory&prefetchEnabled=true&prefetchCount=1 
+
+file-order-route: file:C:\\shipIt\\orders-input?delete=true&readLock=none&moveFailed=error
+file-order-processed: file:C:\\shipIt\\orders-processed
+
+fulfillment-center-file-route: file:C:\\shipIt\\fulfillment-center-file-input
+
+fulfillment-center-rest-route: http://localhost:8082/shipping
